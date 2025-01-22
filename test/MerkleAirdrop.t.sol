@@ -24,6 +24,8 @@ contract MerkleAirdropTest is ZkSyncChainChecker, Test {
         0xe5ebd1e1b5a5478a944ecab36a9a954ac3b6b8216875f6524caa7a1d87096576;
     bytes32[] public PROOF = [proofOne, proofTwo]; // this is taken from the output.json
 
+    address public gasPayer;
+
     function setUp() public {
         if (!isZkSyncChain()) {
             DeployMerkleAirdrop deployer = new DeployMerkleAirdrop();
@@ -34,13 +36,18 @@ contract MerkleAirdropTest is ZkSyncChainChecker, Test {
         token.mint(token.owner(), AMOUNT_TO_CLAIM * AMOUNT_TO_SEND);
         token.transfer(address(airdrop), AMOUNT_TO_SEND);
         (user, privateKey) = makeAddrAndKey("user"); // from foundry to create user and key from this input
+        gasPayer = makeAddr("gasPayer");
     }
 
     function testUsersCanClaim() public {
         uint256 startingBalance = token.balanceOf(user);
+        bytes32 digest = airdrop.getMessageHash(user, AMOUNT_TO_CLAIM);
 
-        vm.startPrank(user);
-        airdrop.claim(user, AMOUNT_TO_CLAIM, PROOF);
+        //sign the message with the user private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        //we are pranking this user so that he call the claim
+        vm.prank(gasPayer);
+        airdrop.claim(user, AMOUNT_TO_CLAIM, PROOF, v, r, s);
 
         uint256 endingBalance = token.balanceOf(user);
         console.log("enging balance:", endingBalance);
